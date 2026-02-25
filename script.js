@@ -3,6 +3,9 @@ console.log(screen);
 console.log("hola")
 screen.width = document.documentElement.clientWidth;
 screen.height = document.documentElement.clientHeight;
+if (screen.width < screen.height) {
+  screen.height = screen.width;
+}
 const ctx = screen.getContext("2d");
 console.log(ctx)
 
