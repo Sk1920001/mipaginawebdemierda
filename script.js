@@ -15,7 +15,7 @@ const cameraUp = [0.0, 1.0, 0.0]
 const lightVect = [0.0, 0.0, 1.0]
 
 const speed = 0.05
-const cameraRotationSpeed = 1
+const cameraRotationSpeed = Math.PI / FPS
 
 
 const keys = {}
@@ -1544,8 +1544,10 @@ function updateInput() {
   if (keys["ArrowLeft"]) cameraPos[0] -= speed;
   if (keys["w"]) cameraPos[2] += speed;
   if (keys["s"]) cameraPos[2] -= speed;
-  if (keys["d"]) cameraForward = rotatePoint(cameraForward, Math.PI / 180 * - cameraRotationSpeed)
-  if (keys["a"]) cameraForward = rotatePoint(cameraForward, Math.PI / 180 * cameraRotationSpeed)
+  if (keys["d"]) cameraForward = rotatePoint(cameraForward, -cameraRotationSpeed)
+  if (keys["a"]) cameraForward = rotatePoint(cameraForward, cameraRotationSpeed)
+  console.log("CameraPos : ", cameraPos)
+  console.log("cameraForward: ", cameraForward)
 }
 
 function multiplyVec3Mat4(v, m) {
@@ -1735,7 +1737,7 @@ function drawShape(shapeFaces, shapeVertices, deltaZ, matrixLookAt) {
     const norm = calculateNormal(vec1, vec2)
 
 
-    if (dotProd(norm, subVec(cameraPos, v1View)) < 0.0) {
+    if (dotProd(norm, v1View) < 0.0) {
       const p1 = denormalizedPoint(projectPoint(v1View))
       const p2 = denormalizedPoint(projectPoint(v2View))
       const p3 = denormalizedPoint(projectPoint(v3View))
