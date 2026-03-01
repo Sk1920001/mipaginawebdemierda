@@ -9,8 +9,8 @@ if (screen.width < screen.height) {
 const ctx = screen.getContext("2d");
 console.log(ctx)
 const FPS = 60
-const cameraPos = { "x": 0.0, "y": 0.0, "z": 0.0 }
-const lightVect = { "x": 0.0, "y": 0.0, "z": 1.0 }
+const cameraPos = [0, 0, 0]
+const lightVect = [0, 0, 1]
 
 let cubeVertices = [
   { "x": 2.338624, "y": -0.331034, "z": 0.100000 },
@@ -775,6 +775,18 @@ let cubeVertices = [
   { "x": 2.436623, "y": -0.331034, "z": 0.100000 },
 ]
 
+const cubeFloatArray = new Float32Array(cubeVertices.length * 3);
+
+for (let i = 0; i < cubeVertices.length; i++) {
+  const v = cubeVertices[i];
+  const offset = i * 3;
+
+  cubeFloatArray[offset] = v.x;
+  cubeFloatArray[offset + 1] = v.y;
+  cubeFloatArray[offset + 2] = v.z;
+}
+
+
 let cubeFaces = [
   [254, 240, 253],
   [311, 371, 310],
@@ -1515,28 +1527,55 @@ let cubeFaces = [
 
 ]
 
-function drawVertex({ x, y }) {
+function multiplyMatrices(A, B) {
+  const rowsA = A.length;
+  const colsA = A[0].length;
+  const rowsB = B.length;
+  const colsB = B[0].length;
+
+  if (colsA !== rowsB) {
+    return "Error: Las columnas de A no coinciden con las filas de B.";
+  }
+
+  const result = Array.from({ length: rowsA }, () => new Array(colsB).fill(0));
+
+  for (let i = 0; i < rowsA; i++) {
+    for (let j = 0; j < colsB; j++) {
+      for (let k = 0; k < colsA; k++) {
+        result[i][j] += A[i][k] * B[k][j];
+      }
+    }
+  }
+
+  return result;
+}
+
+
+
+
+function drawVertex(vec2d) {
   const size = 10
-  const centered_x = x - (size / 2)
-  const centerd_y = y - (size / 2)
+  const centered_x = vec2d[0] - (size / 2)
+  const centerd_y = vec2d[1] - (size / 2)
   ctx.fillStyle = "green"
   ctx.fillRect(centered_x, centerd_y, size, size)
 }
 
+
 function drawLine(p1, p2) {
   ctx.strokeStyle = "green"
   ctx.beginPath()
-  ctx.moveTo(p1.x, p1.y)
-  ctx.lineTo(p2.x, p2.y)
+  ctx.moveTo(p1[0], p1[1])
+  ctx.lineTo(p2[0], p2[1])
   ctx.stroke()
 }
 
 
-function denormalizedPoint({ x, y }) {
-  return {
-    x: ((1 + x) * screen.width / 2),
-    y: ((1 - y) * screen.height / 2)
-  }
+function denormalizedPoint(vec2d) {
+  return [
+    ((1 + vec2d[0]) * screen.width / 2),
+    ((1 - vec2d[1]) * screen.height / 2)
+  ]
 }
 
 function clearScreen() {
@@ -1544,85 +1583,98 @@ function clearScreen() {
   ctx.fillRect(0, 0, screen.width, screen.height)
 }
 
-function translateZ(point, delta) {
-  return {
-    x: point.x,
-    y: point.y,
-    z: point.z + delta
-  }
+function translateZ(point3d, delta) {
+  return [
+    point3d[0],
+    point3d[1],
+    point3d[2] + delta
+  ]
 }
 
-function projectPoint({ x, y, z }) {
-  return {
-    x: x / z,
-    y: y / z
-  }
+function projectPoint(point3d) {
+  return [
+    point3d[0] / point3d[2],
+    point3d[1] / point3d[2]
+  ]
 
 }
 
 function calculateNormal(vec1, vec2) {
-  return {
-    x: vec1.y * vec2.z - vec1.z * vec2.y,
-    y: vec1.z * vec2.x - vec1.x * vec2.z,
-    z: vec1.x * vec2.y - vec1.y * vec2.x
-  }
+  return [
+    vec1[1] * vec2[2] - vec1[2] * vec2[1],
+    vec1[2] * vec2[0] - vec1[0] * vec2[2],
+    vec1[0] * vec2[1] - vec1[1] * vec2[0]
+  ]
 }
 
 function calculateUVect(vec) {
-  const norm = Math.hypot(vec.x, vec.y, vec.z)
-  return {
-    x: vec.x / norm,
-    y: vec.y / norm,
-    z: vec.z / norm
-  }
+  const norm = Math.hypot(vec[0], vec[1], vec[2])
+  return [
+    vec[0] / norm,
+    vec[1] / norm,
+    vec[2] / norm
+  ]
 }
 
 function dotProd(vec1, vec2) {
-  return vec1.x * vec2.x + vec1.y * vec2.y + vec1.z * vec2.z
+  return vec1[0] * vec2[0] + vec1[1] * vec2[1] + vec1[2] * vec2[2]
 }
 
 
 function rotatePoint(point, angle) {
-  return {
-    x: point.x * Math.cos(angle) - point.z * Math.sin(angle),
-    y: point.y,
-    z: point.x * Math.sin(angle) + point.z * Math.cos(angle),
-  }
+  return [
+    point[0] * Math.cos(angle) - point[2] * Math.sin(angle),
+    point[1],
+    point[0] * Math.sin(angle) + point[2] * Math.cos(angle),
+  ]
 }
 
-function calculateVec(p1, p2) {
-  return {
-    x: p2.x - p1.x,
-    y: p2.y - p1.y,
-    z: p2.z - p1.z
-  }
+function subVec(p1, p2) {
+  return [
+    p2[0] - p1[0],
+    p2[1] - p1[1],
+    p2[2] - p1[2]
+  ]
+}
+
+function addVec(p1, p2) {
+  return [
+    p2[0] + p1[0],
+    p2[1] + p1[1],
+    p2[2] + p1[2]
+  ]
 }
 
 
-function drawShape(shapeFaces, shapeVertices, deltaZ) {
+function drawShape(shapeFaces, shapeVertices, deltaZ, offsetIndex) {
   for (let i = 0; i < shapeFaces.length; i++) {
-    const v1 = translateZ(shapeVertices[shapeFaces[i][0] - 1], deltaZ)
-    const v2 = translateZ(shapeVertices[shapeFaces[i][1] - 1], deltaZ)
-    const v3 = translateZ(shapeVertices[shapeFaces[i][2] - 1], deltaZ)
 
-    const vec1 = calculateVec(v1, v2)
-    const vec2 = calculateVec(v1, v3)
+    const idx1 = (shapeFaces[i][0] - 1) * 3;
+    const idx2 = (shapeFaces[i][1] - 1) * 3;
+    const idx3 = (shapeFaces[i][2] - 1) * 3;
+
+    const v1 = translateZ([shapeVertices[idx1], shapeVertices[idx1 + 1], shapeVertices[idx1 + 2]], deltaZ);
+    const v2 = translateZ([shapeVertices[idx2], shapeVertices[idx2 + 1], shapeVertices[idx2 + 2]], deltaZ);
+    const v3 = translateZ([shapeVertices[idx3], shapeVertices[idx3 + 1], shapeVertices[idx3 + 2]], deltaZ);
+
+    const vec1 = subVec(v1, v2)
+    const vec2 = subVec(v1, v3)
 
     const norm = calculateNormal(vec1, vec2)
 
 
-    if (dotProd(norm, calculateVec(cameraPos, v1)) < 0.0) {
-      p1 = denormalizedPoint(projectPoint(v1))
-      p2 = denormalizedPoint(projectPoint(v2))
-      p3 = denormalizedPoint(projectPoint(v3))
+    if (dotProd(norm, subVec(cameraPos, v1)) < 0.0) {
+      const p1 = denormalizedPoint(projectPoint(v1))
+      const p2 = denormalizedPoint(projectPoint(v2))
+      const p3 = denormalizedPoint(projectPoint(v3))
 
       const uNorm = calculateUVect(norm)
       const lightIntensity = Math.trunc(dotProd(uNorm, lightVect) * -100)   //La luz debe ser unitario
 
       ctx.beginPath()
-      ctx.moveTo(p1.x, p1.y)
-      ctx.lineTo(p2.x, p2.y)
-      ctx.lineTo(p3.x, p3.y)
+      ctx.moveTo(p1[0], p1[1])
+      ctx.lineTo(p2[0], p2[1])
+      ctx.lineTo(p3[0], p3[1])
       ctx.closePath()
       ctx.strokeStyle = `hsla(120, 60%, ${lightIntensity / 2}%, 1)`
       ctx.stroke()
@@ -1633,17 +1685,20 @@ function drawShape(shapeFaces, shapeVertices, deltaZ) {
 }
 
 function rotateShape(shapeVertices, angle) {
-  for (let i = 0; i < shapeVertices.length; i++) {
-    shapeVertices[i] = rotatePoint(shapeVertices[i], angle / FPS)
+  for (let i = 0; i < (shapeVertices.length); i += 3) {
+    const rotatedPoint = rotatePoint([shapeVertices[i], shapeVertices[i + 1], shapeVertices[i + 2]], angle / FPS)
+    shapeVertices[i] = rotatedPoint[0]
+    shapeVertices[i + 1] = rotatedPoint[1]
+    shapeVertices[i + 2] = rotatedPoint[2]
   }
 }
 function frame() {
   clearScreen()
-  drawShape(cubeFaces, cubeVertices, 5.0)
-  rotateShape(cubeVertices, Math.PI / 3)
+  drawShape(cubeFaces, cubeFloatArray, 5.0, 3)
+  rotateShape(cubeFloatArray, Math.PI / 3)
   cubeFaces.sort((faceA, faceB) => {
-    const averageZFaceA = (cubeVertices[faceA[0] - 1].z + cubeVertices[faceA[1] - 1].z + cubeVertices[faceA[2] - 1].z) / 3.0
-    const averageZFaceB = (cubeVertices[faceB[0] - 1].z + cubeVertices[faceB[1] - 1].z + cubeVertices[faceB[2] - 1].z) / 3.0
+    const averageZFaceA = (cubeFloatArray[((faceA[0] - 1) * 3) + 2] + cubeFloatArray[((faceA[1] - 1) * 3) + 2] + cubeFloatArray[((faceA[2] - 1) * 3) + 2]) / 3.0
+    const averageZFaceB = (cubeFloatArray[((faceB[0] - 1) * 3) + 2] + cubeFloatArray[((faceB[1] - 1) * 3) + 2] + cubeFloatArray[((faceB[2] - 1) * 3) + 2]) / 3.0
     return averageZFaceB - averageZFaceA
   });
   setTimeout(frame, 1000 / FPS)
