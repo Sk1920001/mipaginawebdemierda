@@ -1736,8 +1736,11 @@ function drawShape(shapeFaces, shapeVertices, deltaZ, matrixLookAt) {
 
     const norm = calculateNormal(vec1, vec2)
 
+    const clipped = v1View[2] <= 0.1 || v2View[2] <= 0.1 || v3View[2] <= 0.1
 
-    if (dotProd(norm, v1View) < 0.0) {
+
+
+    if (dotProd(norm, v1View) < 0.0 && !clipped) {
       const p1 = denormalizedPoint(projectPoint(v1View))
       const p2 = denormalizedPoint(projectPoint(v2View))
       const p3 = denormalizedPoint(projectPoint(v3View))
