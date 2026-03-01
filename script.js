@@ -9,10 +9,19 @@ if (screen.width < screen.height) {
 const ctx = screen.getContext("2d");
 console.log(ctx)
 const FPS = 60
-const cameraPos = [0, 0, 0]
-const cameraForward = [0, 0, 1]
-const cameraUp = [0, 1, 0]
-const lightVect = [0, 0, 1]
+const cameraPos = [0.0, 0.0, 0.0]
+let cameraForward = [0.0, 0.0, 1.0]
+const cameraUp = [0.0, 1.0, 0.0]
+const lightVect = [0.0, 0.0, 1.0]
+
+const speed = 0.05
+const cameraRotationSpeed = 1
+
+
+const keys = {}
+
+window.addEventListener("keydown", e => keys[e.key] = true)
+window.addEventListener("keyup", e => keys[e.key] = false)
 
 const cubeVertices = [
   { "x": 2.338624, "y": -0.331034, "z": 0.100000 },
@@ -1528,13 +1537,23 @@ const cubeFaces = [
 
 ]
 
+function updateInput() {
+  if (keys["ArrowUp"]) cameraPos[1] += speed;
+  if (keys["ArrowDown"]) cameraPos[1] -= speed;
+  if (keys["ArrowRight"]) cameraPos[0] += speed;
+  if (keys["ArrowLeft"]) cameraPos[0] -= speed;
+  if (keys["w"]) cameraPos[2] += speed;
+  if (keys["s"]) cameraPos[2] -= speed;
+  if (keys["d"]) cameraForward = rotatePoint(cameraForward, Math.PI / 180 * - cameraRotationSpeed)
+  if (keys["a"]) cameraForward = rotatePoint(cameraForward, Math.PI / 180 * cameraRotationSpeed)
+}
+
 function multiplyVec3Mat4(v, m) {
   const x = v[0], y = v[1], z = v[2];
 
   const nx = x * m[0][0] + y * m[1][0] + z * m[2][0] + m[3][0];
   const ny = x * m[0][1] + y * m[1][1] + z * m[2][1] + m[3][1];
   const nz = x * m[0][2] + y * m[1][2] + z * m[2][2] + m[3][2];
-  const nw = x * m[0][3] + y * m[1][3] + z * m[2][3] + m[3][3];
 
 
   return [nx, ny, nz];
@@ -1580,7 +1599,8 @@ function invertAtPoint(matrix) {
 
 
 function matrixAtPoint(positionVec, targetVec, upVec) {
-  let newForward = addVec(positionVec, targetVec)
+
+  let newForward = subVec(positionVec, targetVec)
   newForward = calculateUVect(newForward)
 
   const projectedVal = dotProd(newForward, upVec)
@@ -1746,8 +1766,11 @@ function rotateShape(shapeVertices, angle) {
 }
 function frame() {
   clearScreen()
-  const matrixPoint = matrixAtPoint(cameraPos, cameraForward, cameraUp)
+  updateInput()
+  const cameraTargetPoint = addVec(cameraPos, cameraForward)
+  const matrixPoint = matrixAtPoint(cameraPos, cameraTargetPoint, cameraUp)
   const matrixLook = invertAtPoint(matrixPoint)
+  console.log(matrixLook)
   drawShape(cubeFaces, cubeFloatArray, 5.0, matrixLook)
   rotateShape(cubeFloatArray, Math.PI / 3)
   cubeFaces.sort((faceA, faceB) => {
