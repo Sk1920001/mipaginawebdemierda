@@ -10,9 +10,11 @@ const ctx = screen.getContext("2d");
 console.log(ctx)
 const FPS = 60
 const cameraPos = [0, 0, 0]
+const cameraForward = [0, 0, 1]
+const cameraUp = [0, 1, 0]
 const lightVect = [0, 0, 1]
 
-let cubeVertices = [
+const cubeVertices = [
   { "x": 2.338624, "y": -0.331034, "z": 0.100000 },
   { "x": 2.338624, "y": 0.350966, "z": 0.100000 },
   { "x": 2.436623, "y": 0.350966, "z": 0.100000 },
@@ -786,8 +788,7 @@ for (let i = 0; i < cubeVertices.length; i++) {
   cubeFloatArray[offset + 2] = v.z;
 }
 
-
-let cubeFaces = [
+const cubeFaces = [
   [254, 240, 253],
   [311, 371, 310],
   [644, 646, 645],
@@ -1527,6 +1528,19 @@ let cubeFaces = [
 
 ]
 
+function multiplyVec3Mat4(v, m) {
+  const x = v[0], y = v[1], z = v[2];
+
+  const nx = x * m[0][0] + y * m[1][0] + z * m[2][0] + m[3][0];
+  const ny = x * m[0][1] + y * m[1][1] + z * m[2][1] + m[3][1];
+  const nz = x * m[0][2] + y * m[1][2] + z * m[2][2] + m[3][2];
+  const nw = x * m[0][3] + y * m[1][3] + z * m[2][3] + m[3][3];
+
+
+  return [nx, ny, nz];
+}
+
+
 function multiplyMatrices(A, B) {
   const rowsA = A.length;
   const colsA = A[0].length;
@@ -1548,6 +1562,40 @@ function multiplyMatrices(A, B) {
   }
 
   return result;
+}
+
+
+function invertAtPoint(matrix) {
+  const prod1 = -dotProd([matrix[3][0], matrix[3][1], matrix[3][2]], [matrix[0][0], matrix[0][1], matrix[0][2]])
+  const prod2 = -dotProd([matrix[3][0], matrix[3][1], matrix[3][2]], [matrix[1][0], matrix[1][1], matrix[1][2]])
+  const prod3 = -dotProd([matrix[3][0], matrix[3][1], matrix[3][2]], [matrix[2][0], matrix[2][1], matrix[2][2]])
+
+  return [
+    [matrix[0][0], matrix[1][0], matrix[2][0], 0],
+    [matrix[0][1], matrix[1][1], matrix[2][1], 0],
+    [matrix[0][2], matrix[1][2], matrix[2][2], 0],
+    [prod1, prod2, prod3, 1]
+  ];
+}
+
+
+function matrixAtPoint(positionVec, targetVec, upVec) {
+  let newForward = addVec(positionVec, targetVec)
+  newForward = calculateUVect(newForward)
+
+  const projectedVal = dotProd(newForward, upVec)
+  const projectedVec = [projectedVal * newForward[0], projectedVal * newForward[1], projectedVal * newForward[2]]
+
+  const newUp = subVec(projectedVec, upVec)
+
+  const newRight = calculateNormal(newUp, newForward)
+
+  return [
+    [newRight[0], newRight[1], newRight[2], 0],
+    [newUp[0], newUp[1], newUp[2], 0],
+    [newForward[0], newForward[1], newForward[2], 0],
+    [positionVec[0], positionVec[1], positionVec[2], 1],
+  ];
 }
 
 
@@ -1646,7 +1694,7 @@ function addVec(p1, p2) {
 }
 
 
-function drawShape(shapeFaces, shapeVertices, deltaZ, offsetIndex) {
+function drawShape(shapeFaces, shapeVertices, deltaZ, matrixLookAt) {
   for (let i = 0; i < shapeFaces.length; i++) {
 
     const idx1 = (shapeFaces[i][0] - 1) * 3;
@@ -1657,16 +1705,20 @@ function drawShape(shapeFaces, shapeVertices, deltaZ, offsetIndex) {
     const v2 = translateZ([shapeVertices[idx2], shapeVertices[idx2 + 1], shapeVertices[idx2 + 2]], deltaZ);
     const v3 = translateZ([shapeVertices[idx3], shapeVertices[idx3 + 1], shapeVertices[idx3 + 2]], deltaZ);
 
-    const vec1 = subVec(v1, v2)
-    const vec2 = subVec(v1, v3)
+    const v1View = multiplyVec3Mat4(v1, matrixLookAt)
+    const v2View = multiplyVec3Mat4(v2, matrixLookAt)
+    const v3View = multiplyVec3Mat4(v3, matrixLookAt)
+
+    const vec1 = subVec(v1View, v2View)
+    const vec2 = subVec(v1View, v3View)
 
     const norm = calculateNormal(vec1, vec2)
 
 
-    if (dotProd(norm, subVec(cameraPos, v1)) < 0.0) {
-      const p1 = denormalizedPoint(projectPoint(v1))
-      const p2 = denormalizedPoint(projectPoint(v2))
-      const p3 = denormalizedPoint(projectPoint(v3))
+    if (dotProd(norm, subVec(cameraPos, v1View)) < 0.0) {
+      const p1 = denormalizedPoint(projectPoint(v1View))
+      const p2 = denormalizedPoint(projectPoint(v2View))
+      const p3 = denormalizedPoint(projectPoint(v3View))
 
       const uNorm = calculateUVect(norm)
       const lightIntensity = Math.trunc(dotProd(uNorm, lightVect) * -100)   //La luz debe ser unitario
@@ -1694,7 +1746,9 @@ function rotateShape(shapeVertices, angle) {
 }
 function frame() {
   clearScreen()
-  drawShape(cubeFaces, cubeFloatArray, 5.0, 3)
+  const matrixPoint = matrixAtPoint(cameraPos, cameraForward, cameraUp)
+  const matrixLook = invertAtPoint(matrixPoint)
+  drawShape(cubeFaces, cubeFloatArray, 5.0, matrixLook)
   rotateShape(cubeFloatArray, Math.PI / 3)
   cubeFaces.sort((faceA, faceB) => {
     const averageZFaceA = (cubeFloatArray[((faceA[0] - 1) * 3) + 2] + cubeFloatArray[((faceA[1] - 1) * 3) + 2] + cubeFloatArray[((faceA[2] - 1) * 3) + 2]) / 3.0
